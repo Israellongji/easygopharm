@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container py-5 mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h2 class="row justify-content-center" style="color: #8A0303;">Pharmacy Registration</h2>
+            <div class="underline mb-4"></div>
+            <div class="card shadow-m">
+                <div class="card-body">
+                    <h4 class="card-title text-center mb-3">Register Your Pharmacy With EasyGo
+                    </h4>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, msg in messages %}
+                    <div class="alert alert-{{ category }} small">{{ msg }}</div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" action="{{ url_for('register') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Pharmacy Name</label>
+                            <input name="pharmacy_name" class="form-control" placeholder="Name of your pharmcy"
+                                required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input name="email" type="email" class="form-control"
+                                placeholder="Valid pharmacy offical email" required>
+                        </div>
+
+                        <div class="form-group mb-3 position-relative">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" class="form-control"
+                                placeholder="Enter password" required>
+                            <span class="toggle-password" onclick="togglePassword('password', this)"
+                                style="position:absolute; right:10px; top:38px; cursor:pointer;">👁️</span>
+                        </div>
+
+
+                        <div class="form-group mb-3 position-relative">
+                            <label for="confirm_password">Confirm Password</label>
+                            <input type="password" id="confirm_password" name="confirm_password" class="form-control"
+                                placeholder="Confirm password" required>
+                            <span class="toggle-password" onclick="togglePassword('confirm_password', this)"
+                                style="position:absolute; right:10px; top:38px; cursor:pointer;">👁️</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Address (optional)</label>
+                            <input name="address" class="form-control" placeholder="Current pharmacy address">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Contact (phone)</label>
+                            <input name="contact" class="form-control" placeholder="Pharmacy contact phone" required>
+                        </div>
+
+                        <button class="btn btn-danger w-100" type="submit"
+                            style="background-color: #8A0303;">Register</button>
+                    </form>
+
+                    <div class="mt-3 text-center small">
+                        Already registered? <a href="{{ url_for('login') }}">Login here</a>.
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function togglePassword(fieldId, icon) {
+        const input = document.getElementById(fieldId);
+        if (input.type === "password") {
+            input.type = "text";
+            icon.textContent = "🙈";
+        } else {
+            input.type = "password";
+            icon.textContent = "👁️";
+        }
+    }
+</script>
+
+{% endblock %}

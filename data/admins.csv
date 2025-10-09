@@ -1,0 +1,2 @@
+email,password_hash,name
+easygo@easygopharm.com,scrypt:32768:8:1$0WyE7ApjDXVCzsw3$d3858932ecb3dabeff653033d277cfc95e42cb1091117dbaecd8bb776abbef3c81032a48bb682dfe995982f2ed84469b21fb58df4fd195f8189542a36a0957ff,EasyGo Admin
