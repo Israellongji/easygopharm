@@ -19,7 +19,7 @@ from datetime import datetime
 
 # -------------------- BASIC APP SETUP --------------------
 app = Flask(__name__)
-app.secret_key = "easygo_super_secret_key"  # move to env var in production
+app.secret_key = os.getenv("SECRET_KEY", "fallback_secret_key")
 CORS(app)
 
 DATA_DIR = 'data'
@@ -36,13 +36,13 @@ if not os.path.exists(INVENTORY_PATH):
     pd.DataFrame(columns=['Drug Name', 'Pharmacy Name', 'Address', 'Contact', 'Price']).to_csv(INVENTORY_PATH, index=False)
 
 # -------------------- MAIL (Hostinger SMTP) --------------------
-app.config['MAIL_SERVER'] = 'smtp.hostinger.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USERNAME'] = 'easygo@easygopharm.com'
-app.config['MAIL_PASSWORD'] = 'Easygo@1'  # consider moving to an environment variable
-app.config['MAIL_DEFAULT_SENDER'] = ('EasyGo Pharm', 'easygo@easygopharm.com')
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER")
+app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 465))
+app.config['MAIL_USE_SSL'] = os.getenv("MAIL_USE_SSL", "True") == "True"
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "False") == "True"
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = ('EasyGo Pharm', os.getenv("MAIL_DEFAULT_SENDER"))
 
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
@@ -169,8 +169,8 @@ def ensure_admin_exists():
     Admin credentials set here per your instruction.
     """
     if not os.path.exists(ADMINS_PATH) or os.path.getsize(ADMINS_PATH) == 0:
-        admin_email = "easygo@easygopharm.com"
-        admin_password_plain = "Easygo@1"
+        admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+        admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
         hashed = generate_password_hash(admin_password_plain)
         with open(ADMINS_PATH, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['email', 'password_hash', 'name'])
