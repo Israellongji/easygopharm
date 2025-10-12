@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, render_template, url_for, redirect, f
 from flask_cors import CORS
 from itsdangerous import URLSafeTimedSerializer
 import secrets
-from flask_mail import Mail, Message
 from flask_login import (
     LoginManager, UserMixin, login_user,
     login_required, logout_user, current_user
@@ -13,13 +12,19 @@ import csv
 import os
 import pandas as pd
 import json
-import smtplib
-from email.mime.text import MIMEText
 from datetime import datetime
+from dotenv import load_dotenv
 
-# -------------------- BASIC APP SETUP --------------------
+# Brevo (Sendinblue) SDK
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
+
+# -------------------- CONFIG & APP SETUP --------------------
+# Load environment variables
+load_dotenv()
+
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "fallback_secret_key")
+app.secret_key = os.getenv("SECRET_KEY", "easygo_super_secret_key")
 CORS(app)
 
 DATA_DIR = 'data'
@@ -35,82 +40,53 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(INVENTORY_PATH):
     pd.DataFrame(columns=['Drug Name', 'Pharmacy Name', 'Address', 'Contact', 'Price']).to_csv(INVENTORY_PATH, index=False)
 
-# -------------------- MAIL (Hostinger SMTP) --------------------
-app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER")
-app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 465))
-app.config['MAIL_USE_SSL'] = os.getenv("MAIL_USE_SSL", "True") == "True"
-app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "False") == "True"
-app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
-app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
-app.config['MAIL_DEFAULT_SENDER'] = ('EasyGo Pharm', os.getenv("MAIL_DEFAULT_SENDER"))
+# -------------------- BREVO EMAIL SETUP --------------------
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SENDER = os.getenv("BREVO_SENDER_EMAIL", "easygo@easygopharm.com")
 
-mail = Mail(app)
-serializer = URLSafeTimedSerializer(app.secret_key)
+if not BREVO_API_KEY:
+    print("WARNING: BREVO_API_KEY not set. Email sending will fail unless this is provided in environment.")
 
-#----------------FORGOT PASSWORD ROUTE -------------------
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form['email']
-        # Check if the email exists in pharmacies.csv
-        with open('data/pharmacies.csv', 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row['email'] == email:
-                    token = serializer.dumps(email, salt='password-reset')
-                    reset_url = url_for('reset_password', token=token, _external=True)
+brevo_config = sib_api_v3_sdk.Configuration()
+if BREVO_API_KEY:
+    brevo_config.api_key['api-key'] = BREVO_API_KEY
+brevo_api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(brevo_config))
 
-                    msg = Message('Password Reset - EasyGo Pharm',
-                                  sender='easygo@easygopharm.com',
-                                  recipients=[email])
-                    msg.body = f'Click this link to reset your password:\n{reset_url}\n\nThis link expires in 30 minutes.'
-                    mail.send(msg)
-                    flash('Password reset link has been sent to your email.', 'info')
-                    return redirect(url_for('login'))
-        flash('Email not found. Please check and try again.', 'danger')
-    return render_template('forgot_password.html')
+def send_email_via_brevo(subject: str, html_body: str, to_emails):
+    """
+    Send one or more emails using Brevo transactional API.
+    to_emails: string or list of strings
+    Returns True on success, False on failure.
+    """
+    if isinstance(to_emails, str):
+        to_emails = [to_emails]
+    to_list = [{"email": e} for e in to_emails]
 
-#----------------RESET PASSWORD ROUTE -------------------
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
     try:
-        email = serializer.loads(token, salt='password-reset', max_age=1800)
-    except:
-        flash('The reset link is invalid or expired.', 'danger')
-        return redirect(url_for('forgot_password'))
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=to_list,
+            sender={"email": BREVO_SENDER, "name": "EasyGo Pharm"},
+            subject=subject,
+            html_content=html_body
+        )
+        response = brevo_api.send_transac_email(send_smtp_email)
+        # If no exception, assume success
+        return True
+    except ApiException as e:
+        # print response for debugging
+        print("Brevo ApiException:", e)
+        try:
+            # attempt to print body if available
+            print("Brevo response body:", e.body)
+        except Exception:
+            pass
+        return False
+    except Exception as ex:
+        print("Brevo send error:", ex)
+        return False
 
-    if request.method == 'POST':
-        new_password = request.form['new_password']
-
-        rows = []
-        updated = False
-
-        # ✅ Read and update password_hash for the correct user
-        with open('data/pharmacies.csv', 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            fieldnames = reader.fieldnames
-            for row in reader:
-                if row['email'].lower() == email.lower():
-                   # ✅ Hash the new password before saving
-                    row['password_hash'] = generate_password_hash(new_password)
-                    updated = True
-                rows.append(row)
-
-        # ✅ Write updated data back safely
-        if updated:
-            with open('data/pharmacies.csv', 'w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(rows)
-
-            flash('Your password has been reset successfully.', 'success')
-            return redirect(url_for('login'))
-        else:
-            flash('Email not found in records.', 'danger')
-
-    return render_template('reset_password.html')
-
-
+# -------------------- TOKEN SERIALIZER --------------------
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------- LOGIN MANAGER --------------------
 login_manager = LoginManager()
@@ -119,7 +95,6 @@ login_manager.login_view = 'login'  # default
 
 class User(UserMixin):
     def __init__(self, id, email, name, is_admin=False):
-        # id will be like "pharm-<index>" or "admin-<index>"
         self.id = id
         self.email = email
         self.name = name
@@ -127,18 +102,12 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    """
-    user_id format:
-      - pharm-<index>
-      - admin-<index>
-    """
     try:
         prefix, idx = user_id.split('-', 1)
     except Exception:
         return None
 
     if prefix == 'pharm':
-        # load pharmacies
         if not os.path.exists(PHARMACIES_PATH):
             return None
         with open(PHARMACIES_PATH, newline='', encoding='utf-8') as f:
@@ -166,11 +135,11 @@ def load_user(user_id):
 def ensure_admin_exists():
     """
     Create admins.csv with provided admin credentials if it doesn't exist or is empty.
-    Admin credentials set here per your instruction.
+    Admin credentials come from env or fallback to defaults.
     """
+    admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+    admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
     if not os.path.exists(ADMINS_PATH) or os.path.getsize(ADMINS_PATH) == 0:
-        admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
-        admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
         hashed = generate_password_hash(admin_password_plain)
         with open(ADMINS_PATH, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['email', 'password_hash', 'name'])
@@ -203,7 +172,7 @@ def append_pharmacy(email, password_hash, pharmacy_name, address, contact):
             'contact': contact
         })
 
-# -------------------- ROUTES: public --------------------
+# -------------------- ROUTES: public pages --------------------
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -232,18 +201,15 @@ def privacy():
 def terms():
     return render_template('terms.html')
 
-
-# Keep your /search route (unchanged behavior)
+# -------------------- SEARCH ROUTE --------------------
 @app.route('/search')
 def search():
     query = request.args.get('q', '').lower()
     results = []
     csv_path = INVENTORY_PATH
-    # read CSV with pandas so it tolerates varying quoting/encoding
     try:
         df = pd.read_csv(csv_path, encoding='utf-8-sig')
     except Exception:
-        # fallback to csv module
         with open(csv_path, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             for item in reader:
@@ -265,83 +231,187 @@ def search():
             })
     return jsonify(results)
 
-# Old /request route (kept; uses smtplib as before)
+# -------------------- REQUEST ROUTE (uses Brevo) --------------------
 @app.route("/request", methods=["POST"])
 def request_drug():
-    data = request.json
-    name = data.get("name")
-    email = data.get("email")
-    phone = data.get("phone")
-    drug_name = data.get("drugName")
-    dosage = data.get("dosage")
-    info = data.get("info")
+    data = request.json or {}
+    name = data.get("name", "")
+    email = data.get("email", "")
+    phone = data.get("phone", "")
+    drug_name = data.get("drug", "")
+    dosage = data.get("dosage", "")
+    info = data.get("info", "")
 
-    subject = f"New Drug Request from {name}"
+    subject = f"New Drug Request from {name or 'Anonymous'}"
     body = f"""
-You have received a new drug request from EasyGo Pharm:
-
-Name: {name}
-Email: {email}
-Phone: {phone}
-Drug: {drug_name}
-Dosage: {dosage}
-Additional Info: {info}
+<h3>New drug request — EasyGo Pharm</h3>
+<p><strong>Name:</strong> {name}</p>
+<p><strong>Email:</strong> {email}</p>
+<p><strong>Phone:</strong> {phone}</p>
+<p><strong>Drug:</strong> {drug_name}</p>
+<p><strong>Dosage:</strong> {dosage}</p>
+<p><strong>Additional Info:</strong> {info}</p>
+<p>Submitted at: {datetime.utcnow().isoformat()} UTC</p>
 """
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = "easygo@easygopharm.com"
-    msg["To"] = "easygo@easygopharm.com"
-
-    try:
-        with smtplib.SMTP("smtp.hostinger.com", 587) as server:
-            server.starttls()
-            server.login("easygo@easygopharm.com", "Easygo@1")
-            server.send_message(msg)
+    # send to admin email (BREVO_SENDER as from)
+    admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+    success = send_email_via_brevo(subject, body, admin_email)
+    if success:
         return jsonify({"success": True, "message": "Request sent successfully!"}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    else:
+        return jsonify({"success": False, "error": "Failed to send email"}), 500
+
+# -------------------- FORGOT PASSWORD / RESET (Brevo) --------------------
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        if not email:
+            flash('Please provide your registered email.', 'warning')
+            return redirect(url_for('forgot_password'))
+
+        found = False
+        with open(PHARMACIES_PATH, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('email', '').lower() == email.lower():
+                    found = True
+                    token = serializer.dumps(email, salt='password-reset')
+                    reset_url = url_for('reset_password', token=token, _external=True)
+                    body = f"""
+<p>Click the link below to reset your EasyGo Pharm password (expires in 30 minutes):</p>
+<p><a href="{reset_url}">{reset_url}</a></p>
+"""
+                    if send_email_via_brevo("Password Reset - EasyGo Pharm", body, email):
+                        flash('Password reset link has been sent to your email.', 'info')
+                    else:
+                        flash('Failed to send reset email. Try again later.', 'danger')
+                    break
+        if not found:
+            flash('Email not found. Please check and try again.', 'danger')
+        return redirect(url_for('login'))
+
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=1800)
+    except Exception:
+        flash('The reset link is invalid or expired.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '')
+        if not new_password:
+            flash('Please enter a new password.', 'warning')
+            return redirect(url_for('reset_password', token=token))
+
+        rows = []
+        updated = False
+        with open(PHARMACIES_PATH, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row.get('email', '').lower() == email.lower():
+                    row['password_hash'] = generate_password_hash(new_password)
+                    updated = True
+                rows.append(row)
+
+        if updated:
+            with open(PHARMACIES_PATH, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            flash('Your password has been reset successfully.', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Email not found in records.', 'danger')
+            return redirect(url_for('forgot_password'))
+
+    return render_template('reset_password.html')
 
 # -------------------- ROUTES: registration & pharmacy login --------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """Pharmacy registration"""
     if request.method == 'POST':
-        email = request.form.get('email').strip()
-        pharmacy_name = request.form.get('pharmacy_name').strip()
-        password = request.form.get('password')
+        email = request.form.get('email', '').strip()
+        pharmacy_name = request.form.get('pharmacy_name', '').strip()
+        password = request.form.get('password', '')
         address = request.form.get('address', '').strip()
         contact = request.form.get('contact', '').strip()
 
-        # basic validation
         if not email or not pharmacy_name or not password:
             flash('Please fill all required fields.', 'danger')
             return redirect(url_for('register'))
 
-        # check existing email
         pharmacies = read_pharmacies()
         for p in pharmacies:
-            if p.get('email').lower() == email.lower():
+            if p.get('email', '').lower() == email.lower():
                 flash('An account with that email already exists. Please login.', 'warning')
                 return redirect(url_for('login'))
 
         password_hash = generate_password_hash(password)
         append_pharmacy(email, password_hash, pharmacy_name, address, contact)
         flash('Registration successful. Please login.', 'success')
+
+        # === 📧 Send Notification Emails ===
+        admin_email = "easygo@easygopharm.com"
+
+        try:
+            # Email to Pharmacy (Welcome)
+            pharmacy_subject = "Welcome to EasyGo Pharm!"
+            pharmacy_message = f"""
+            Hi {pharmacy_name},
+
+            Welcome to EasyGo Pharm! Your pharmacy account has been successfully registered.
+
+            Pharmacy Name: {pharmacy_name}
+            Email: {email}
+            Contact: {contact}
+            Address: {address}
+
+            You can now log in and start using EasyGo Pharm.
+
+            Best regards,  
+            EasyGo Pharm Team
+            """
+
+            send_email_via_brevo(pharmacy_subject, pharmacy_message, email)
+
+            # Email to Admin (Notification)
+            admin_subject = "New Pharmacy Registration - EasyGo Pharm"
+            admin_message = f"""
+            A new pharmacy has just registered on EasyGo Pharm:
+
+            Pharmacy Name: {pharmacy_name}
+            Email: {email}
+            Address: {address}
+            Contact: {contact}
+
+            You can view their details in pharmacies.csv.
+            """
+
+            send_email_via_brevo(admin_subject, admin_message, admin_email)
+
+        except Exception as e:
+            print(f"Error sending registration emails: {e}")
+
+
         return redirect(url_for('login'))
 
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Pharmacy login"""
     if request.method == 'POST':
-        email = request.form.get('email').strip()
-        password = request.form.get('password')
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
 
         pharmacies = read_pharmacies()
         for i, p in enumerate(pharmacies):
-            if p.get('email').lower() == email.lower():
+            if p.get('email', '').lower() == email.lower():
                 if check_password_hash(p.get('password_hash', ''), password):
                     user_id = f'pharm-{i}'
                     login_user(User(user_id, p.get('email'), p.get('pharmacy_name'), is_admin=False))
@@ -355,14 +425,13 @@ def login():
 
     return render_template('login.html')
 
-# -------------------- ROUTES: admin login --------------------
+# -------------------- ADMIN LOGIN --------------------
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        email = request.form.get('email').strip()
-        password = request.form.get('password')
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
 
-        # read admins csv
         if os.path.exists(ADMINS_PATH):
             with open(ADMINS_PATH, newline='', encoding='utf-8') as f:
                 admins = list(csv.DictReader(f))
@@ -370,7 +439,7 @@ def admin_login():
             admins = []
 
         for i, a in enumerate(admins):
-            if a.get('email').lower() == email.lower():
+            if a.get('email', '').lower() == email.lower():
                 if check_password_hash(a.get('password_hash', ''), password):
                     user_id = f'admin-{i}'
                     login_user(User(user_id, a.get('email'), a.get('name'), is_admin=True))
@@ -384,13 +453,12 @@ def admin_login():
 
     return render_template('admin_login.html')
 
-# -------------------- ROUTES: logout --------------------
+# -------------------- LOGOUT --------------------
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     flash('You have been logged out.', 'info')
-    # Redirect smartly based on role
     try:
         if current_user.is_admin:
             return redirect(url_for('admin_login'))
@@ -398,16 +466,14 @@ def logout():
         pass
     return redirect(url_for('login'))
 
-# -------------------- ROUTES: pharmacy area --------------------
+# -------------------- PHARMACY DASHBOARD & UPLOAD --------------------
 @app.route('/pharmacy/dashboard')
 @login_required
 def pharmacy_dashboard():
-    # only pharmacies
     if current_user.is_admin:
         flash('Admins must use the admin dashboard.', 'warning')
         return redirect(url_for('admin_dashboard'))
 
-    # load inventory and filter
     try:
         df = pd.read_csv(INVENTORY_PATH, encoding='utf-8-sig')
     except Exception:
@@ -424,12 +490,10 @@ def pharmacy_dashboard():
 @app.route('/pharmacy/upload_inventory', methods=['GET', 'POST'])
 @login_required
 def pharmacy_upload_inventory():
-    # ensure only pharmacy users
     if current_user.is_admin:
         flash('Admins cannot upload via pharmacy upload. Use admin dashboard.', 'warning')
         return redirect(url_for('admin_dashboard'))
 
-    message = None
     if request.method == 'POST':
         file = request.files.get('file')
         if not file:
@@ -447,42 +511,30 @@ def pharmacy_upload_inventory():
                 flash("CSV format is incorrect. Make sure headers: Drug Name, Pharmacy Name, Address, Contact, Price", 'danger')
                 return redirect(url_for('pharmacy_upload_inventory'))
 
-            # force pharmacy name to current user's pharmacy name
             uploaded_df['Pharmacy Name'] = current_user.name
 
-            # merge with master inventory
             try:
                 main_df = pd.read_csv(INVENTORY_PATH, encoding='utf-8-sig')
             except Exception:
                 main_df = pd.DataFrame(columns=required_columns)
 
             combined_df = pd.concat([main_df, uploaded_df], ignore_index=True)
-
-            # drop duplicates (drug + pharmacy)
             combined_df.drop_duplicates(subset=['Drug Name', 'Pharmacy Name'], keep='last', inplace=True)
-
             combined_df.to_csv(INVENTORY_PATH, index=False, encoding='utf-8-sig')
             flash('Inventory uploaded successfully.', 'success')
 
-            # send admin notification email
-            try:
-                record_count = len(uploaded_df)
-                msg = Message(
-                    subject="New Pharmacy Inventory Upload",
-                    recipients=["easygo@easygopharm.com"],
-                    body=f"""New inventory uploaded.
-
-Pharmacy: {current_user.name}
-Records Uploaded: {record_count}
-Uploaded At: {datetime.utcnow().isoformat()} UTC
-
--- EasyGo Pharm
+            # send admin notification via Brevo
+            record_count = len(uploaded_df)
+            subject = "New Pharmacy Inventory Upload"
+            body = f"""
+<p>New inventory uploaded.</p>
+<p><strong>Pharmacy:</strong> {current_user.name}</p>
+<p><strong>Records Uploaded:</strong> {record_count}</p>
+<p><strong>Uploaded At (UTC):</strong> {datetime.utcnow().isoformat()}</p>
 """
-                )
-                mail.send(msg)
-            except Exception as e:
-                # log failure but don't stop flow
-                print("Failed to send upload notification:", e)
+            admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+            if not send_email_via_brevo(subject, body, admin_email):
+                print("Failed to send upload notification email via Brevo")
 
             return redirect(url_for('pharmacy_dashboard'))
 
@@ -494,7 +546,7 @@ Uploaded At: {datetime.utcnow().isoformat()} UTC
 
     return render_template('upload_inventory.html', pharmacy=current_user.name)
 
-# -------------------- ROUTES: admin dashboard --------------------
+# -------------------- ADMIN DASHBOARD --------------------
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
@@ -502,7 +554,6 @@ def admin_dashboard():
         flash('Access denied: Admins only.', 'danger')
         return redirect(url_for('login'))
 
-    # Load full inventory
     try:
         df = pd.read_csv(INVENTORY_PATH, encoding='utf-8-sig')
     except Exception:
@@ -510,7 +561,6 @@ def admin_dashboard():
 
     inventory_table = df.to_html(classes='table table-bordered table-sm', index=False)
 
-    # Load pharmacies list
     pharmacies = read_pharmacies()
     pharm_df = pd.DataFrame(pharmacies)
     pharm_table = pharm_df.to_html(classes='table table-striped table-sm', index=False) if not pharm_df.empty else "<p>No registered pharmacies.</p>"
