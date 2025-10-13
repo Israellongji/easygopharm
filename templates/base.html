@@ -185,6 +185,10 @@
                 <div class="mt-2">
                     <a href="/">Home</a>
                 </div>
+
+                <div class="mt-2">
+                    <a href="/login">Pharmcy Login</a>
+                </div>
             </div>
             <p class="mb-0">&copy; 2025 EasyGo. All rights reserved.</p>
         </div>
@@ -238,26 +242,24 @@
                 });
             }
 
-            // ✅ REQUEST FORM HANDLER
+            // ✅ REQUEST FORM HANDLER WITH FILE UPLOAD
             const requestForm = document.getElementById("requestForm");
             if (requestForm) {
                 requestForm.addEventListener("submit", async (e) => {
                     e.preventDefault();
 
-                    const formData = {
-                        name: document.getElementById("reqName").value.trim(),
-                        email: document.getElementById("reqEmail").value.trim(),
-                        phone: document.getElementById('reqPhone').value.trim(),
-                        drug: document.getElementById("reqDrug").value.trim(),
-                        dosage: document.getElementById("reqDosage").value.trim(),
-                        info: document.getElementById("reqInfo").value.trim(),
-                    };
+                    const formData = new FormData(requestForm);
+                    formData.append("name", document.getElementById("reqName").value.trim());
+                    formData.append("email", document.getElementById("reqEmail").value.trim());
+                    formData.append("phone", document.getElementById("reqPhone").value.trim());
+                    formData.append("drug", document.getElementById("reqDrug").value.trim());
+                    formData.append("dosage", document.getElementById("reqDosage").value.trim());
+                    formData.append("info", document.getElementById("reqInfo").value.trim());
 
                     try {
                         const response = await fetch("/request", {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(formData),
+                            body: formData
                         });
 
                         const result = await response.json();

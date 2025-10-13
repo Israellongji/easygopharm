@@ -14,10 +14,13 @@ import pandas as pd
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+
 
 # Brevo (Sendinblue) SDK
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+import base64 # for encoding attachments 
 
 # -------------------- CONFIG & APP SETUP --------------------
 # Load environment variables
@@ -52,7 +55,7 @@ if BREVO_API_KEY:
     brevo_config.api_key['api-key'] = BREVO_API_KEY
 brevo_api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(brevo_config))
 
-def send_email_via_brevo(subject: str, html_body: str, to_emails):
+def send_email_via_brevo(subject: str, html_body: str, to_emails, attachments=None):
     """
     Send one or more emails using Brevo transactional API.
     to_emails: string or list of strings
@@ -67,10 +70,12 @@ def send_email_via_brevo(subject: str, html_body: str, to_emails):
             to=to_list,
             sender={"email": BREVO_SENDER, "name": "EasyGo Pharm"},
             subject=subject,
-            html_content=html_body
+            html_content=html_body,
+            attachment=attachments if attachments else None
         )
         response = brevo_api.send_transac_email(send_smtp_email)
         # If no exception, assume success
+        print("✅ Brevo email sent:", response)
         return True
     except ApiException as e:
         # print response for debugging
@@ -234,30 +239,55 @@ def search():
 # -------------------- REQUEST ROUTE (uses Brevo) --------------------
 @app.route("/request", methods=["POST"])
 def request_drug():
-    data = request.json or {}
-    name = data.get("name", "")
-    email = data.get("email", "")
-    phone = data.get("phone", "")
-    drug_name = data.get("drug", "")
-    dosage = data.get("dosage", "")
-    info = data.get("info", "")
+    name = request.form.get("name", "")
+    email = request.form.get("email", "")
+    phone = request.form.get("phone", "")
+    drug_name = request.form.get("drug", "")
+    dosage = request.form.get("dosage", "")
+    info = request.form.get("info", "")
+    file = request.files.get("prescription")
 
     subject = f"New Drug Request from {name or 'Anonymous'}"
     body = f"""
-<h3>New drug request — EasyGo Pharm</h3>
-<p><strong>Name:</strong> {name}</p>
-<p><strong>Email:</strong> {email}</p>
-<p><strong>Phone:</strong> {phone}</p>
-<p><strong>Drug:</strong> {drug_name}</p>
-<p><strong>Dosage:</strong> {dosage}</p>
-<p><strong>Additional Info:</strong> {info}</p>
-<p>Submitted at: {datetime.utcnow().isoformat()} UTC</p>
-"""
+    <h3>New drug request — EasyGo Pharm</h3>
+    <p><strong>Name:</strong> {name}</p>
+    <p><strong>Email:</strong> {email}</p>
+    <p><strong>Phone:</strong> {phone}</p>
+    <p><strong>Drug:</strong> {drug_name}</p>
+    <p><strong>Dosage:</strong> {dosage}</p>
+    <p><strong>Additional Info:</strong> {info}</p>
+    <p>Submitted at: {datetime.utcnow().isoformat()} UTC</p>
+    """
 
-    # send to admin email (BREVO_SENDER as from)
+    # Handle file upload and prepare for Brevo
+    attachments = []
+    if file:
+        filename = secure_filename(file.filename)
+        file_content = file.read()
+        file_base64 = base64.b64encode(file_content).decode("utf-8")
+        attachments.append({
+            "name": filename,
+            "content": file_base64
+        })
+
     admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
-    success = send_email_via_brevo(subject, body, admin_email)
-    if success:
+
+    # Send to admin and user
+    success_admin = send_email_via_brevo(subject, body, admin_email, attachments=attachments)
+    user_subject = "EasyGo Pharm - Request Received"
+    user_body = f"""
+    <h3>Hi {name},</h3>
+    <p>We’ve received your drug request and will get back to you shortly.</p>
+    <p><b>Drug:</b> {drug_name}</p>
+    <p><b>Dosage:</b> {dosage}</p>
+    <p><b>Email:</b> {email}</p>
+    <p><b>Phone:</b> {phone}</p>
+    <p><b>Info:</b> {info}</p>
+    <p>Thank you for using <strong>EasyGo Pharm</strong>.</p>
+    """
+    success_user = send_email_via_brevo(user_subject, user_body, email)
+
+    if success_admin or success_user:
         return jsonify({"success": True, "message": "Request sent successfully!"}), 200
     else:
         return jsonify({"success": False, "error": "Failed to send email"}), 500

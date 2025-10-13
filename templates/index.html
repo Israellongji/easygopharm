@@ -197,25 +197,25 @@
             </p>
             <div class="row justify-content-center">
                 <div class="col-md-8">
-                    <form id="requestForm" class="p-4 border rounded bg-white shadow-sm">
-                        <div class="mb-3">
+                    <form id="requestForm" class="p-4 border rounded bg-white shadow-m" enctype="multipart/form-data">
+                        <div class="form-group mb-3">
                             <label for="reqName" class="form-label fw-bold">Full Name</label>
                             <input type="text" id="reqName" class="form-control" placeholder="Enter your name" required>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="form-group mb-3">
                             <label for="reqEmail" class="form-label fw-bold">Email</label>
                             <input type="email" id="reqEmail" class="form-control" placeholder="Enter your email"
                                 required>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="form-group mb-3">
                             <label for="reqDrug" class="form-label fw-bold">Drug Name</label>
                             <input type="text" id="reqDrug" class="form-control" placeholder="Enter the drug name"
                                 required>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="form-group mb-3">
                             <label for="reqDosage" class="form-label fw-bold">Dosage</label>
                             <input type="text" id="reqDosage" class="form-control" placeholder="e.g. 500mg" required>
                         </div>
@@ -226,11 +226,17 @@
                                 placeholder="Enter your phone number" required>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="form-group mb-3">
                             <label for="reqInfo" class="form-label fw-bold">Additional Information</label>
                             <textarea id="reqInfo" class="form-control" rows="3"
                                 placeholder="Any extra details (optional)"></textarea>
                         </div>
+
+                        <div class="form-group mb-3">
+                            <label for="reqFile" class="form-label fw-bold">Upload Prescription (optional)</label>
+                            <input type="file" id="reqFile" name="prescription" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+                            <small class="text-muted">Accepted formats: JPG, PNG, or PDF (max 5MB)</small>
+                          </div>                          
 
 
 
