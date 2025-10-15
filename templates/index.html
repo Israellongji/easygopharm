@@ -250,59 +250,50 @@
 
 
     <!-- How It Works Section -->
-    <section id="how" class="how text-center py-5 mb-4">
+    <section class="features-section text-center text-md-start py-5 my-5">
         <div class="container">
-            <h2 class="mb-4" style="color: #8A0303;"><strong>How It Works</strong></h2>
+            <h2 class="mb-4 text-center" style="color: #8A0303;"><strong>How It Works</strong></h2>
             <div class="underline"></div> <br>
-            <!-- For patients -->
+            <!-- For Patients -->
             <div class="mb-5">
-                <h3 style="text-align: left; color: #8A0303;">For Patients:</h3>
-                <div class="row g-6">
-                    <div class="col-md-4">
-                        <div class="p-4 shadow-m">
-                            <h4>1. Search or request medicine. </h4>
-                            <!-- <p>Quickly search any drug with our smart search tool.</p> -->
-                        </div>
+            <h3 class="fw-bold mb-3" style="color: #8A0303;">For Patients:</h3>
+            <div class="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-center">
+                <div class="feature-item">
+                <i class="fa-solid fa-magnifying-glass feature-icon"></i> 
+                <span>Search or request medicine.</span>
+                </div>
+                <div class="feature-item">
+                <i class="fa-solid fa-pills feature-icon"></i>
+                <span>Get matched with pharmacies.</span>
+                </div>
+                <div class="feature-item">
+                <i class="fa-solid fa-link feature-icon"></i>
+                <span>Connect to order.</span>
+                </div>
+            </div>
+            </div>
+        
+            <!-- For Pharmacies -->
+            <div class="mb-5">
+                <h3 class="fw-bold mb-3 pt-5" style="color: #8A0303;">For Pharmacies:</h3>
+                <div class="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-center">
+                    <div class="feature-item">
+                        <i class="fa-solid fa-file-signature feature-icon"></i>
+                        <span>Register your pharmacy.</span>
                     </div>
-                    <div class="col-md-4">
-                        <div class="p-4 shadow-m">
-                            <h4>2. Get matched with pharmacies.</h4>
-                            <!-- <p>You request, we handle the rest.</p> -->
-                        </div>
+                    <div class="feature-item">
+                        <i class="fa-solid fa-boxes-stacked feature-icon"></i>
+                        <span>Upload or sync your inventory.</span>
                     </div>
-                    <div class="col-md-4">
-                        <div class="p-4 shadow-m">
-                            <h4>3. Connect to order.</h4>
-                            <!-- <p>Connect with trusted suppliers.</p> -->
-                        </div>
+                    <div class="feature-item">
+                        <i class="fa-solid fa-user-group feature-icon"></i>
+                        <span>Receive patient requests.</span>
                     </div>
                 </div>
             </div>
-            <!-- For pharmacies -->
-            <h3 style="text-align: left; color: #8A0303;">For Pharmacies:</h3>
-            <div class="row g-6">
-                <div class="col-md-4">
-                    <div class="p-4 shadow-m">
-                        <h4>1. Register your pharmacy.</h4>
-                        <!-- <p>Quickly search any drug with our smart search tool.</p> -->
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="p-4 shadow-m">
-                        <h4>2. Upload or sync your inventory.</h4>
-                        <!-- <p>You request, we handle the rest.</p> -->
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="p-4 shadow-m">
-                        <h4>3. Receive patient requests.</h4>
-                        <!-- <p>Connect with trusted suppliers.</p> -->
-                    </div>
-                </div>
-            </div>
-
         </div>
     </section>
+  
 
 
     {% endblock %}
