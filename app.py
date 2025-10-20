@@ -430,6 +430,7 @@ def register():
 
         # === 📧 Send Notification Emails ===
         admin_email = "easygo@easygopharm.com"
+        email = email  # pharmacy email
 
         try:
             # Email to Pharmacy (Welcome)
