@@ -443,6 +443,7 @@ def register():
             <b>Contact:</b> {contact}<br>
             <b>Address:</b> {address}<br><br>
             You can now log in and start using EasyGo Pharm.<br><br>
+            NOTICE: Your Pharmacy will be reviewed by our admin team and if any discrepancies are found your account will be revoked.<br><br>
             Best regards,<br>
             <b>EasyGo Pharm Team</b>
             """
