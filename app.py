@@ -27,7 +27,7 @@ import base64 # for encoding attachments
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "easygo_super_secret_key")
+app.secret_key = os.getenv("SECRET_KEY", "fallback_secret_key")
 CORS(app)
 
 DATA_DIR = 'data'
@@ -43,54 +43,16 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(INVENTORY_PATH):
     pd.DataFrame(columns=['Drug Name', 'Pharmacy Name', 'Address', 'Contact', 'Price']).to_csv(INVENTORY_PATH, index=False)
 
-# -------------------- BREVO EMAIL SETUP --------------------
-BREVO_API_KEY = os.getenv("BREVO_API_KEY")
-BREVO_SENDER = os.getenv("BREVO_SENDER_EMAIL", "easygo@easygopharm.com")
+# -------------------- MAIL (Hostinger SMTP) --------------------
+app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER")
+app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 465))
+app.config['MAIL_USE_SSL'] = os.getenv("MAIL_USE_SSL", "True") == "True"
+app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "False") == "True"
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = ('EasyGo Pharm', os.getenv("MAIL_DEFAULT_SENDER"))
 
-if not BREVO_API_KEY:
-    print("WARNING: BREVO_API_KEY not set. Email sending will fail unless this is provided in environment.")
-
-brevo_config = sib_api_v3_sdk.Configuration()
-if BREVO_API_KEY:
-    brevo_config.api_key['api-key'] = BREVO_API_KEY
-brevo_api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(brevo_config))
-
-def send_email_via_brevo(subject: str, html_body: str, to_emails, attachments=None):
-    """
-    Send one or more emails using Brevo transactional API.
-    to_emails: string or list of strings
-    Returns True on success, False on failure.
-    """
-    if isinstance(to_emails, str):
-        to_emails = [to_emails]
-    to_list = [{"email": e} for e in to_emails]
-
-    try:
-        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-            to=to_list,
-            sender={"email": BREVO_SENDER, "name": "EasyGo Pharm"},
-            subject=subject,
-            html_content=html_body,
-            attachment=attachments if attachments else None
-        )
-        response = brevo_api.send_transac_email(send_smtp_email)
-        # If no exception, assume success
-        print("✅ Brevo email sent:", response)
-        return True
-    except ApiException as e:
-        # print response for debugging
-        print("Brevo ApiException:", e)
-        try:
-            # attempt to print body if available
-            print("Brevo response body:", e.body)
-        except Exception:
-            pass
-        return False
-    except Exception as ex:
-        print("Brevo send error:", ex)
-        return False
-
-# -------------------- TOKEN SERIALIZER --------------------
+mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------- LOGIN MANAGER --------------------
@@ -145,6 +107,8 @@ def ensure_admin_exists():
     admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
     admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
     if not os.path.exists(ADMINS_PATH) or os.path.getsize(ADMINS_PATH) == 0:
+        admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+        admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
         hashed = generate_password_hash(admin_password_plain)
         with open(ADMINS_PATH, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['email', 'password_hash', 'name'])
