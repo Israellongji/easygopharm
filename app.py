@@ -15,19 +15,26 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+from flask_mail import Mail, Message
 
 
 # Brevo (Sendinblue) SDK
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
-import base64 # for encoding attachments 
+import base64 # for encoding attachments
+
+#Google Cloud API
+import gspread
+from google.oauth2.service_account import Credentials
+
+
 
 # -------------------- CONFIG & APP SETUP --------------------
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "fallback_secret_key")
+app.secret_key = os.getenv("SECRET_KEY", "easygo_super_secret_key")
 CORS(app)
 
 DATA_DIR = 'data'
@@ -43,16 +50,54 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(INVENTORY_PATH):
     pd.DataFrame(columns=['Drug Name', 'Pharmacy Name', 'Address', 'Contact', 'Price']).to_csv(INVENTORY_PATH, index=False)
 
-# -------------------- MAIL (Hostinger SMTP) --------------------
-app.config['MAIL_SERVER'] = os.getenv("MAIL_SERVER")
-app.config['MAIL_PORT'] = int(os.getenv("MAIL_PORT", 465))
-app.config['MAIL_USE_SSL'] = os.getenv("MAIL_USE_SSL", "True") == "True"
-app.config['MAIL_USE_TLS'] = os.getenv("MAIL_USE_TLS", "False") == "True"
-app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
-app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
-app.config['MAIL_DEFAULT_SENDER'] = ('EasyGo Pharm', os.getenv("MAIL_DEFAULT_SENDER"))
+# -------------------- BREVO EMAIL SETUP --------------------
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+BREVO_SENDER = os.getenv("BREVO_SENDER_EMAIL", "easygo@easygopharm.com")
 
-mail = Mail(app)
+if not BREVO_API_KEY:
+    print("WARNING: BREVO_API_KEY not set. Email sending will fail unless this is provided in environment.")
+
+brevo_config = sib_api_v3_sdk.Configuration()
+if BREVO_API_KEY:
+    brevo_config.api_key['api-key'] = BREVO_API_KEY
+brevo_api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(brevo_config))
+
+def send_email_via_brevo(subject: str, html_body: str, to_emails, attachments=None):
+    """
+    Send one or more emails using Brevo transactional API.
+    to_emails: string or list of strings
+    Returns True on success, False on failure.
+    """
+    if isinstance(to_emails, str):
+        to_emails = [to_emails]
+    to_list = [{"email": e} for e in to_emails]
+
+    try:
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=to_list,
+            sender={"email": BREVO_SENDER, "name": "EasyGo Pharm"},
+            subject=subject,
+            html_content=html_body,
+            attachment=attachments if attachments else None
+        )
+        response = brevo_api.send_transac_email(send_smtp_email)
+        # If no exception, assume success
+        print("✅ Brevo email sent:", response)
+        return True
+    except ApiException as e:
+        # print response for debugging
+        print("Brevo ApiException:", e)
+        try:
+            # attempt to print body if available
+            print("Brevo response body:", e.body)
+        except Exception:
+            pass
+        return False
+    except Exception as ex:
+        print("Brevo send error:", ex)
+        return False
+
+# -------------------- TOKEN SERIALIZER --------------------
 serializer = URLSafeTimedSerializer(app.secret_key)
 
 # -------------------- LOGIN MANAGER --------------------
@@ -107,8 +152,6 @@ def ensure_admin_exists():
     admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
     admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
     if not os.path.exists(ADMINS_PATH) or os.path.getsize(ADMINS_PATH) == 0:
-        admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
-        admin_password_plain = os.getenv("ADMIN_PASSWORD", "Easygo@1")
         hashed = generate_password_hash(admin_password_plain)
         with open(ADMINS_PATH, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['email', 'password_hash', 'name'])
@@ -327,6 +370,27 @@ def reset_password(token):
     return render_template('reset_password.html')
 
 # -------------------- ROUTES: registration & pharmacy login --------------------
+# -------------------- GOOGLE SHEETS SETUP --------------------
+# Use the correct full set of scopes
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+# Load the service account with full drive and sheets access
+creds = Credentials.from_service_account_file(
+    "service_account.json",
+    scopes=scope
+)
+
+# Authorize the gspread client
+client = gspread.authorize(creds)
+
+# Replace with your Google Sheet name
+SHEET_NAME = "EasyGo Pharm Database"
+sheet = client.open(SHEET_NAME).sheet1
+
+# -------------------- REGISTER ROUTE --------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -350,6 +414,20 @@ def register():
         append_pharmacy(email, password_hash, pharmacy_name, address, contact)
         flash('Registration successful. Please login.', 'success')
 
+        # === 🧾 Add Pharmacy Data to Google Sheet ===
+        try:
+            sheet.append_row([
+                pharmacy_name,
+                email,
+                password_hash,
+                address,
+                contact,
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            ])
+            print(f"✅ Added {pharmacy_name} to Google Sheet")
+        except Exception as e:
+            print(f"⚠️ Error adding to Google Sheet: {e}")
+
         # === 📧 Send Notification Emails ===
         admin_email = "easygo@easygopharm.com"
 
@@ -357,19 +435,15 @@ def register():
             # Email to Pharmacy (Welcome)
             pharmacy_subject = "Welcome to EasyGo Pharm!"
             pharmacy_message = f"""
-            Hi {pharmacy_name},
-
-            Welcome to EasyGo Pharm! Your pharmacy account has been successfully registered.
-
-            Pharmacy Name: {pharmacy_name}
-            Email: {email}
-            Contact: {contact}
-            Address: {address}
-
-            You can now log in and start using EasyGo Pharm.
-
-            Best regards,  
-            EasyGo Pharm Team
+            Hi {pharmacy_name},<br><br>
+            Welcome to <b>EasyGo Pharm!</b> Your pharmacy account has been successfully registered.<br><br>
+            <b>Pharmacy Name:</b> {pharmacy_name}<br>
+            <b>Email:</b> {email}<br>
+            <b>Contact:</b> {contact}<br>
+            <b>Address:</b> {address}<br><br>
+            You can now log in and start using EasyGo Pharm.<br><br>
+            Best regards,<br>
+            <b>EasyGo Pharm Team</b>
             """
 
             send_email_via_brevo(pharmacy_subject, pharmacy_message, email)
@@ -377,21 +451,18 @@ def register():
             # Email to Admin (Notification)
             admin_subject = "New Pharmacy Registration - EasyGo Pharm"
             admin_message = f"""
-            A new pharmacy has just registered on EasyGo Pharm:
-
-            Pharmacy Name: {pharmacy_name}
-            Email: {email}
-            Address: {address}
-            Contact: {contact}
-
-            You can view their details in pharmacies.csv.
+            <h3>New Pharmacy Registration</h3>
+            <p><b>Pharmacy Name:</b> {pharmacy_name}</p>
+            <p><b>Email:</b> {email}</p>
+            <p><b>Address:</b> {address}</p>
+            <p><b>Contact:</b> {contact}</p>
+            <p><b>Registered at:</b> {datetime.utcnow().isoformat()} UTC</p>
             """
 
             send_email_via_brevo(admin_subject, admin_message, admin_email)
 
         except Exception as e:
             print(f"Error sending registration emails: {e}")
-
 
         return redirect(url_for('login'))
 
