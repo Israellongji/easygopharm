@@ -131,8 +131,10 @@
         ul li {
             margin-bottom: 8px;
         }
+
         .feature-icon {
-            color: #8A0303; /* blood-red color */
+            color: #8A0303;
+            /* blood-red color */
             margin-right: 8px;
             font-size: 1.2rem;
         }
@@ -143,6 +145,37 @@
         }
 
 
+        /* ===== Request Toggle Button Styling (Blood Red 3D Effect) ===== */
+        .request-toggle .btn {
+            border: 2px solid #8A0303;
+            font-weight: 600;
+            width: 150px;
+            border-radius: 30px;
+            transition: all 0.3s ease;
+            box-shadow: none;
+        }
+
+        .request-toggle .btn.active {
+            background-color: #8A0303;
+            color: white;
+            border-color: #6C0202;
+            /* Darker blood-red border */
+            box-shadow: 0 4px 10px rgba(138, 3, 3, 0.3);
+            /* Soft red glow */
+            transform: translateY(-2px);
+        }
+
+        .request-toggle .btn.inactive {
+            background-color: white;
+            color: #8A0303;
+            border-color: #8A0303;
+            box-shadow: none;
+        }
+
+        .request-toggle .btn:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 
@@ -208,7 +241,9 @@
 
                 <div class="mt-2">
                     <p class="mb-0">Office Address:</p>
-                    <a href="https://maps.app.goo.gl/vB2jZWLexzJ8zgqz9"> <address> 5 Kwaji Close, Maitama, Abuja 904101, Federal Capital Territory</address></a>
+                    <a href="https://maps.app.goo.gl/vB2jZWLexzJ8zgqz9">
+                        <address> 5 Kwaji Close, Maitama, Abuja 904101, Federal Capital Territory</address>
+                    </a>
                 </div>
 
                 <div class="mt-2">
@@ -268,7 +303,7 @@
             }
 
             // ✅ REQUEST FORM HANDLER WITH FILE UPLOAD
-            const requestForm = document.getElementById("requestForm");
+            const requestForm = document.getElementById("individualForm");
             if (requestForm) {
                 requestForm.addEventListener("submit", async (e) => {
                     e.preventDefault();
@@ -298,6 +333,74 @@
             }
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const individualBtn = document.getElementById("individualBtn");
+            const wholesaleBtn = document.getElementById("wholesaleBtn");
+            const individualForm = document.getElementById("individualForm");
+            const wholesaleForm = document.getElementById("wholesaleForm");
+
+            if (individualBtn && wholesaleBtn) {
+                individualBtn.addEventListener("click", () => {
+                    individualForm.style.display = "block";
+                    wholesaleForm.style.display = "none";
+
+                    // Toggle classes
+                    individualBtn.classList.add("active");
+                    individualBtn.classList.remove("inactive");
+                    wholesaleBtn.classList.add("inactive");
+                    wholesaleBtn.classList.remove("active");
+                });
+
+                wholesaleBtn.addEventListener("click", () => {
+                    wholesaleForm.style.display = "block";
+                    individualForm.style.display = "none";
+
+                    // Toggle classes
+                    wholesaleBtn.classList.add("active");
+                    wholesaleBtn.classList.remove("inactive");
+                    individualBtn.classList.add("inactive");
+                    individualBtn.classList.remove("active");
+                });
+            }
+
+            // WHOLESALE FORM SUBMIT
+            const wholesaleFormEl = document.getElementById("wholesaleForm");
+            if (wholesaleFormEl) {
+                wholesaleFormEl.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData();
+
+                    formData.append("companyName", document.getElementById("companyName").value.trim());
+                    formData.append("companyAddress", document.getElementById("companyAddress").value.trim());
+                    formData.append("companyNumber", document.getElementById("companyNumber").value.trim());
+                    formData.append("contactPerson", document.getElementById("contactPerson").value.trim());
+                    formData.append("email", document.getElementById("wholesaleEmail").value.trim());
+                    formData.append("drugList", document.getElementById("drugList").value.trim());
+                    formData.append("delivery", document.getElementById("delivery").value.trim());
+
+                    const fileInput = document.getElementById("wholesaleFile");
+                    if (fileInput.files.length > 0) {
+                        formData.append("wholesaleFile", fileInput.files[0]);
+                    }
+
+                    try {
+                        const response = await fetch("/request_wholesale", {
+                            method: "POST",
+                            body: formData
+                        });
+                        const result = await response.json();
+                        alert(result.message || "Wholesale request sent successfully!");
+                        wholesaleFormEl.reset();
+                    } catch (error) {
+                        console.error("Error submitting wholesale request:", error);
+                        alert("An error occurred. Please try again later.");
+                    }
+                });
+            }
+        });
+    </script>
+
 </body>
 
 </html>

@@ -192,59 +192,121 @@
         <div class="container">
             <h2 class="text-center mb-4 fw-bold" style="color: #8A0303;">Request a Drug</h2>
             <div class="underline"></div>
-            <p class="text-center mb-2 py-2 text-muted">
-                Can't find a drug in our inventory? Fill out the form below and we’ll get back to you.
+            <p class="text-center mb-3 text-muted">
+                Can't find a drug in our inventory? Choose your request type below.
             </p>
-            <div class="row justify-content-center">
-                <div class="col-md-8">
-                    <form id="requestForm" class="p-4 border rounded bg-white shadow-m" enctype="multipart/form-data">
-                        <div class="form-group mb-3">
-                            <label for="reqName" class="form-label fw-bold">Full Name</label>
-                            <input type="text" id="reqName" class="form-control" placeholder="Enter your name" required>
-                        </div>
 
-                        <div class="form-group mb-3">
-                            <label for="reqEmail" class="form-label fw-bold">Email</label>
-                            <input type="email" id="reqEmail" class="form-control" placeholder="Enter your email"
-                                required>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="reqDrug" class="form-label fw-bold">Drug Name</label>
-                            <input type="text" id="reqDrug" class="form-control" placeholder="Enter the drug name"
-                                required>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="reqDosage" class="form-label fw-bold">Dosage</label>
-                            <input type="text" id="reqDosage" class="form-control" placeholder="e.g. 500mg" required>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="reqPhone" class="form-label fw-bold">Contact Number</label>
-                            <input type="tel" id="reqPhone" name="phone" class="form-control"
-                                placeholder="Enter your phone number" required>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="reqInfo" class="form-label fw-bold">Additional Information</label>
-                            <textarea id="reqInfo" class="form-control" rows="3"
-                                placeholder="Any extra details (optional)"></textarea>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label for="reqFile" class="form-label fw-bold">Upload Prescription (optional)</label>
-                            <input type="file" id="reqFile" name="prescription" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
-                            <small class="text-muted">Accepted formats: JPG, PNG, or PDF (max 5MB)</small>
-                          </div>                          
-
-
-
-                        <button type="submit" class="btn btn-danger w-100" style="background-color: #8A0303;">Submit
-                            Request</button>
-                    </form>
-                </div>
+            <!-- Toggle Buttons -->
+            <div class="text-center mb-4 request-toggle">
+                <button id="individualBtn" class="btn active me-2">Individual</button>
+                <button id="wholesaleBtn" class="btn inactive">Wholesale</button>
             </div>
+
+            <!-- INDIVIDUAL REQUEST FORM -->
+            <form id="individualForm" class="p-4 border rounded bg-white shadow-sm" enctype="multipart/form-data">
+                <div class="form-group mb-3">
+                    <label for="reqName" class="form-label fw-bold">Full Name</label>
+                    <input type="text" id="reqName" class="form-control" placeholder="Enter your name" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqEmail" class="form-label fw-bold">Email</label>
+                    <input type="email" id="reqEmail" class="form-control" placeholder="Enter your email" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqDrug" class="form-label fw-bold">Drug Name</label>
+                    <input type="text" id="reqDrug" class="form-control" placeholder="Enter the drug name" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqDosage" class="form-label fw-bold">Dosage</label>
+                    <input type="text" id="reqDosage" class="form-control" placeholder="e.g. 500mg" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqPhone" class="form-label fw-bold">Contact Number</label>
+                    <input type="tel" id="reqPhone" name="phone" class="form-control"
+                        placeholder="Enter your phone number" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqInfo" class="form-label fw-bold">Additional Information</label>
+                    <textarea id="reqInfo" class="form-control" rows="3"
+                        placeholder="Any extra details (optional)"></textarea>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="reqFile" class="form-label fw-bold">Upload Prescription (optional)</label>
+                    <input type="file" id="reqFile" name="prescription" class="form-control"
+                        accept=".jpg,.jpeg,.png,.pdf">
+                    <small class="text-muted">Accepted formats: JPG, PNG, or PDF (max 5MB)</small>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100" style="background-color: #8A0303;">
+                    Submit Individual Request
+                </button>
+            </form>
+
+            <!-- WHOLESALE REQUEST FORM -->
+            <form id="wholesaleForm" class="p-4 border rounded bg-white shadow-sm" enctype="multipart/form-data"
+                style="display: none;">
+                <div class="form-group mb-3">
+                    <label for="companyName" class="form-label fw-bold">Company Name</label>
+                    <input type="text" id="companyName" class="form-control" placeholder="Enter your company name"
+                        required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="companyAddress" class="form-label fw-bold">Company Address</label>
+                    <input type="text" id="companyAddress" class="form-control" placeholder="Enter your company address"
+                        required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="companyNumber" class="form-label fw-bold">Company Number</label>
+                    <input type="text" id="companyNumber" class="form-control" placeholder="Enter your company number"
+                        required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="contactPerson" class="form-label fw-bold">Contact Person</label>
+                    <input type="text" id="contactPerson" class="form-control" placeholder="Enter contact person's name"
+                        required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="wholesaleEmail" class="form-label fw-bold">Company Email</label>
+                    <input type="email" id="wholesaleEmail" class="form-control" placeholder="Enter your company email"
+                        required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="drugList" class="form-label fw-bold">Drug List / Quantity</label>
+                    <textarea id="drugList" class="form-control" rows="3"
+                        placeholder="List drugs and quantities required" required></textarea>
+                </div>
+
+                <!-- ✅ NEW FILE UPLOAD FIELD -->
+                <div class="form-group mb-3">
+                    <label for="wholesaleFile" class="form-label fw-bold">Upload Bulk Order List (optional)</label>
+                    <input type="file" id="wholesaleFile" name="wholesaleFile" class="form-control"
+                        accept=".csv,.xlsx,.xls,.pdf,.jpg,.jpeg,.png">
+                    <small class="text-muted">Accepted formats: CSV, Excel, PDF, JPG, PNG (max 5MB)</small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="delivery" class="form-label fw-bold">Delivery Preference</label>
+                    <select id="delivery" class="form-select">
+                        <option value="Pickup">Pickup</option>
+                        <option value="Delivery">Delivery</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100" style="background-color: #8A0303;">
+                    Submit Wholesale Request
+                </button>
+            </form>
         </div>
     </section>
 
@@ -256,23 +318,23 @@
             <div class="underline"></div> <br>
             <!-- For Patients -->
             <div class="mb-5">
-            <h3 class="fw-bold mb-3" style="color: #8A0303;">For Patients:</h3>
-            <div class="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-center">
-                <div class="feature-item">
-                <i class="fa-solid fa-magnifying-glass feature-icon"></i> 
-                <span>Search or request medicine.</span>
-                </div>
-                <div class="feature-item">
-                <i class="fa-solid fa-pills feature-icon"></i>
-                <span>Get matched with pharmacies.</span>
-                </div>
-                <div class="feature-item">
-                <i class="fa-solid fa-link feature-icon"></i>
-                <span>Connect to order.</span>
+                <h3 class="fw-bold mb-3" style="color: #8A0303;">For Patients:</h3>
+                <div class="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-center">
+                    <div class="feature-item">
+                        <i class="fa-solid fa-magnifying-glass feature-icon"></i>
+                        <span>Search or request medicine.</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fa-solid fa-pills feature-icon"></i>
+                        <span>Get matched with pharmacies.</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fa-solid fa-link feature-icon"></i>
+                        <span>Connect to order.</span>
+                    </div>
                 </div>
             </div>
-            </div>
-        
+
             <!-- For Pharmacies -->
             <div class="mb-5">
                 <h3 class="fw-bold mb-3 pt-5" style="color: #8A0303;">For Pharmacies:</h3>
@@ -293,7 +355,7 @@
             </div>
         </div>
     </section>
-  
+
 
 
     {% endblock %}

@@ -298,6 +298,70 @@ def request_drug():
         return jsonify({"success": True, "message": "Request sent successfully!"}), 200
     else:
         return jsonify({"success": False, "error": "Failed to send email"}), 500
+    
+# -------------------- WHOLESALE REQUEST ROUTE (with file upload) --------------------
+@app.route("/request_wholesale", methods=["POST"])
+def request_wholesale():
+    try:
+        company_name = request.form.get("companyName", "")
+        company_address = request.form.get("companyAddress", "")
+        company_number = request.form.get(" companyNumber", "") 
+        contact_person = request.form.get("contactPerson", "")
+        email = request.form.get("email", "")
+        drug_list = request.form.get("drugList", "")
+        delivery = request.form.get("delivery", "")
+        file = request.files.get("wholesaleFile")
+
+        subject = f"Wholesale Drug Request from {company_name}"
+        body = f"""
+        <h3>New Wholesale Request — EasyGo Pharm</h3>
+        <p><strong>Company Name:</strong> {company_name}</p>
+        <p><strong>Company Address:</strong> {company_address}</p>
+        <p><strong>Company Number:</strong> {company_number}</p>
+        <p><strong>Contact Person:</strong> {contact_person}</p>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Drug List / Quantity:</strong><br>{drug_list}</p>
+        <p><strong>Delivery Preference:</strong> {delivery}</p>
+        <p>Submitted at: {datetime.utcnow().isoformat()} UTC</p>
+        """
+
+        attachments = []
+        if file:
+            filename = secure_filename(file.filename)
+            file_content = file.read()
+            file_base64 = base64.b64encode(file_content).decode("utf-8")
+            attachments.append({
+                "name": filename,
+                "content": file_base64
+            })
+
+        admin_email = os.getenv("ADMIN_EMAIL", "easygo@easygopharm.com")
+
+        # Send email to admin
+        send_email_via_brevo(subject, body, admin_email, attachments=attachments)
+
+        # Send confirmation to wholesale user
+        user_subject = "EasyGo Pharm - Wholesale Request Received"
+        user_body = f"""
+        <h3>Hi {contact_person},</h3>
+        <p>We’ve received your wholesale drug request and will get back to you shortly.</p>
+        <p><b>Company:</b> {company_name}</p>
+        <p><b>Address:</b> {company_address}</p>
+        <p><b>Contact Number:</b> {company_number}</p>
+        <p><b>Contact Person:</b> {contact_person}</p>
+        <p><b>Email:</b> {email}</p>
+        <p><b>Delivery Preference:</b> {delivery}</p>
+        <p><b>Drug List:</b><br>{drug_list}</p>
+        <p>Thank you for choosing <strong>EasyGo Pharm</strong>.</p>
+        """
+        send_email_via_brevo(user_subject, user_body, email)
+
+        return jsonify({"success": True, "message": "Wholesale request sent successfully!"}), 200
+
+    except Exception as e:
+        print("Error processing wholesale request:", e)
+        return jsonify({"success": False, "error": "Internal Server Error"}), 500
+
 
 # -------------------- FORGOT PASSWORD / RESET (Brevo) --------------------
 @app.route('/forgot_password', methods=['GET', 'POST'])
