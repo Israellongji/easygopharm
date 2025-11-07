@@ -305,7 +305,7 @@ def request_wholesale():
     try:
         company_name = request.form.get("companyName", "")
         company_address = request.form.get("companyAddress", "")
-        company_number = request.form.get(" companyNumber", "") 
+        company_number = request.form.get("companyNumber", "") 
         contact_person = request.form.get("contactPerson", "")
         email = request.form.get("email", "")
         drug_list = request.form.get("drugList", "")
