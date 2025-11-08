@@ -252,6 +252,7 @@ def request_drug():
     drug_name = request.form.get("drug", "")
     dosage = request.form.get("dosage", "")
     info = request.form.get("info", "")
+    delivery = request.form.get("delivery", "")
     file = request.files.get("prescription")
 
     subject = f"New Drug Request from {name or 'Anonymous'}"
@@ -263,6 +264,8 @@ def request_drug():
     <p><strong>Drug:</strong> {drug_name}</p>
     <p><strong>Dosage:</strong> {dosage}</p>
     <p><strong>Additional Info:</strong> {info}</p>
+    <p><strong>Delivery Preference:</strong> {delivery}</p>
+
     <p>Submitted at: {datetime.utcnow().isoformat()} UTC</p>
     """
 
@@ -290,6 +293,8 @@ def request_drug():
     <p><b>Email:</b> {email}</p>
     <p><b>Phone:</b> {phone}</p>
     <p><b>Info:</b> {info}</p>
+    <p><strong>Delivery Preference:</strong> {delivery}</p>
+
     <p>Thank you for using <strong>EasyGo Pharm</strong>.</p>
     """
     success_user = send_email_via_brevo(user_subject, user_body, email)

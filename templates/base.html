@@ -219,10 +219,11 @@
                 <div>
                     <h4>Contact Us</h4>
                 </div>
-                <a href="https://instagram.com/yourusername" target="_blank" class="text-white mx-2 fs-4">
+                <a href="https://www.instagram.com/easygo_pharm/" target="_blank" class="text-white mx-2 fs-4">
                     <i class="bi bi-instagram"></i>
                 </a>
-                <a href="https://facebook.com/yourusername" target="_blank" class="text-white mx-2 fs-4">
+                <a href="https://web.facebook.com/profile.php?id=61583364513976" target="_blank"
+                    class="text-white mx-2 fs-4">
                     <i class="bi bi-facebook"></i>
                 </a>
                 <a href="https://twitter.com/yourusername" target="_blank" class="text-white mx-2 fs-4">
@@ -315,6 +316,7 @@
                     formData.append("drug", document.getElementById("reqDrug").value.trim());
                     formData.append("dosage", document.getElementById("reqDosage").value.trim());
                     formData.append("info", document.getElementById("reqInfo").value.trim());
+                    formData.append("delivery", document.getElementById("delivery").value.trim());
 
                     try {
                         const response = await fetch("/request", {
